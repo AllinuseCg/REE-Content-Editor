@@ -20,3 +20,4 @@ ce_config.json
 /ContentEditor.App/resources
 crashlog.txt
 configs/user
+.idea

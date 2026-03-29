@@ -70,6 +70,9 @@ public class MeshViewer : FileEditor, IDisposable, IFocusableFileHandleReference
 
     private string? lastImportSourcePath;
 
+    private string batchExportPrefix = "";
+    private bool showBatchExportPopup;
+
     private bool showSkeleton;
     private GizmoShapeBuilder? _skeletonBuilder;
     private MeshHandle? gizmoMeshHandle;
@@ -695,6 +698,14 @@ public class MeshViewer : FileEditor, IDisposable, IFocusableFileHandleReference
 
     private void ShowTexControls()
     {
+        if (PrimaryAnimator?.File != null) {
+            ImGui.SeparatorText("Animation Export");
+            if (ImGui.Button($"{AppIcons.SI_GenericExport} Batch export animations")) {
+                showBatchExportPopup = true;
+                ImGui.OpenPopup("Batch Export Animations");
+            }
+        }
+
         if (meshContexts.Any(mc => mc.HasValidLoadedMdf2)) {
             ImGui.SeparatorText("Texture Export");
             if (ImGui.Button($"{AppIcons.SI_FileType_TEX} Batch export textures")) {
@@ -702,6 +713,8 @@ public class MeshViewer : FileEditor, IDisposable, IFocusableFileHandleReference
                 ImGui.OpenPopup("Batch MDF exporter");
             }
         }
+
+        ShowBatchExportAnimationPopup();
 
         if (mdfExporter != null) {
             if (ImGui.BeginPopupModal("Batch MDF exporter")) {
@@ -711,6 +724,89 @@ public class MeshViewer : FileEditor, IDisposable, IFocusableFileHandleReference
                 }
                 ImGui.EndPopup();
             }
+        }
+    }
+
+    private void ShowBatchExportAnimationPopup()
+    {
+        if (!showBatchExportPopup) return;
+
+        if (ImGui.BeginPopupModal("Batch Export Animations", ref showBatchExportPopup)) {
+            var animator = PrimaryAnimator;
+            if (animator?.File == null) {
+                ImGui.Text("No animations available");
+                if (ImGui.Button("Close")) {
+                    showBatchExportPopup = false;
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.EndPopup();
+                return;
+            }
+
+            ImGui.SeparatorText("Export Settings");
+
+            ImGui.Text("Prefix:");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(200);
+            ImGui.InputText("##prefix", ref batchExportPrefix, 100);
+
+            ImGui.SeparatorText("Animations to export");
+
+            IEnumerable<MotFileBase> mots;
+            if (animator.File.Format.format == KnownFileFormats.Motion) {
+                mots = [animator.File.GetFile<MotFile>()];
+            } else {
+                mots = animator.File.GetFile<MotlistFile>().MotFiles;
+            }
+
+            var motList = mots.ToList();
+            ImGui.BeginChild("AnimList", new Vector2(0, 150), ImGuiChildFlags.Borders);
+            foreach (var mot in motList) {
+                ImGui.BulletText(mot.Name);
+            }
+            ImGui.EndChild();
+
+            ImGui.Text($"Total: {motList.Count} animations");
+
+            ImGui.Separator();
+
+            if (ImGui.Button("Cancel")) {
+                showBatchExportPopup = false;
+                ImGui.CloseCurrentPopup();
+            }
+
+            ImGui.SameLine();
+
+            if (ImGui.Button("Export")) {
+                var wnd = EditorWindow.CurrentWindow;
+                PlatformUtils.ShowFolderDialog((targetFolder) => {
+                    wnd!.InvokeFromUIThread(() => {
+                        try {
+                            exportInProgress = true;
+                            if (meshContexts.FirstOrDefault()?.MeshFile is CommonMeshResource assmesh) {
+                                foreach (var mot in motList) {
+                                    if (mot is not MotFile mm) continue;
+                                    var filename = $"{batchExportPrefix}{mot.Name}.fbx";
+                                    var filepath = Path.Combine(targetFolder, filename);
+                                    assmesh.ExportToFile(filepath, exportLods, exportOcclusion,
+                                        exportFbxskel ? PrimaryAnimator?.skeleton : null,
+                                        new[] { mm },
+                                        null);
+                                }
+                                FileSystemUtils.ShowFileInExplorer(targetFolder);
+                            }
+                        } catch (Exception e) {
+                            Logger.Error(e, "Batch animation export failed");
+                        } finally {
+                            exportInProgress = false;
+                            showBatchExportPopup = false;
+                        }
+                    });
+                });
+                ImGui.CloseCurrentPopup();
+            }
+
+            ImGui.EndPopup();
         }
     }
 

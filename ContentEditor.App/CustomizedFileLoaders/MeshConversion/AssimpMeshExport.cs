@@ -52,8 +52,8 @@ public partial class CommonMeshResource : IResourceFile
         anim.Name = mot.Name;
         anim.TicksPerSecond = mot.Header.FrameRate;
         anim.DurationInTicks = mot.Header.endFrame;
-        // fbx is stupid and we need to do this for the keyframes to read correctly
-        var timescale = isFbx ? mot.Header.FrameRate / 24f : 1;
+        // use 1:1 frame mapping for Maya compatibility
+        var timescale = 1f;
 
         var nodeDict = new Dictionary<uint, Node>();
         foreach (var node in FlatNodes(scene.RootNode)) {
