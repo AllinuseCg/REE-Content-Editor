@@ -121,7 +121,14 @@ public partial class CommonMeshResource(string name, Workspace workspace) : IRes
             }
         }
         // PrintTree(scene.RootNode, 0);
-        context.ExportFile(scene, filepath, exportFormat);
+
+        // For FBX export, use ASCII format (fbxa) instead of binary (fbx) for easier debugging
+        if (exportFormat.Equals("fbx", StringComparison.OrdinalIgnoreCase)) {
+            // Use "fbxa" format ID for ASCII FBX export
+            context.ExportFile(scene, filepath, "fbxa");
+        } else {
+            context.ExportFile(scene, filepath, exportFormat);
+        }
     }
 
     internal void PreloadMeshBuffers()
